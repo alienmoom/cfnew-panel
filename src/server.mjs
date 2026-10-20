@@ -148,6 +148,8 @@ async function handleWorkerApi(request, workerBase, access, suffix) {
 
 export async function handlePanel(request) {
   const url = new URL(request.url);
+
+  if (url.pathname === '/health') return Response.json({ ok: true });
   if (url.pathname.startsWith('/worker-api/')) {
     const match = url.pathname.match(/^\/worker-api\/([^/]+)\/([0-9a-f-]+)(\/.*)$/i);
     if (!match || !uuidPattern.test(match[2])) return Response.json({ success: false, message: '接口地址无效' }, { status: 400 });
@@ -174,7 +176,7 @@ export async function handlePanel(request) {
     }
   }
   if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('只支持 GET', { status: 405 });
-  if (url.pathname === '/health') return Response.json({ ok: true });
+
   if (url.pathname === '/rules-license') return new Response(rulesLicense, { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' } });
   if (url.pathname === '/') {
     if (boundWorker) return new Response('hello', { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
@@ -242,6 +244,9 @@ export function createPanelServer() {
 
 if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT || 3100);
-  const host = process.env.HOST || '127.0.0.1';
-  createPanelServer().listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
+  const host = process.env.HOST || '0.0.0.0';
+  const server = createPanelServer().listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
+  const shutdown = () => server.close(() => process.exit(0));
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
