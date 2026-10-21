@@ -80,6 +80,7 @@ async function requestWorkerApi(workerBase, uuid, suffix, method = 'GET', body =
       method, headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (compatible; CFnewPanel)', ...(body !== undefined ? { 'Content-Length': String(Buffer.byteLength(body)) } : {}) },
       lookup: (_host, options, callback) => options.all ? callback(null, [address]) : callback(null, address.address, address.family),
     }, response => {
+
       const chunks = []; let size = 0;
       response.on('data', chunk => {
         size += chunk.length;
@@ -215,7 +216,9 @@ export async function handlePanel(request) {
 
 export function createPanelServer() {
   return createHttpServer(async (incoming, outgoing) => {
+    console.log('[REQ]', incoming.method, incoming.url);
     try {
+
       const chunks = []; let size = 0;
       if (!['GET', 'HEAD'].includes(incoming.method)) {
         for await (const chunk of incoming) {
@@ -243,9 +246,13 @@ export function createPanelServer() {
 }
 
 if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.on('uncaughtException', (err) => console.error('[UNCAUGHT EXCEPTION]', err));
+  process.on('unhandledRejection', (err) => console.error('[UNHANDLED REJECTION]', err));
   const port = Number(process.env.PORT || 3100);
   const host = process.env.HOST || '0.0.0.0';
-  const server = createPanelServer().listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
+  const server = createPanelServer();
+  server.on('error', (err) => console.error('[SERVER ERROR]', err));
+  server.listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
   const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
