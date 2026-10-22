@@ -248,12 +248,27 @@ export function createPanelServer() {
 if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.on('uncaughtException', (err) => console.error('[UNCAUGHT EXCEPTION]', err));
   process.on('unhandledRejection', (err) => console.error('[UNHANDLED REJECTION]', err));
-  const port = Number(process.env.PORT || 3100);
+  const mainPort = Number(process.env.PORT || 3100);
   const host = process.env.HOST || '0.0.0.0';
-  const server = createPanelServer();
-  server.on('error', (err) => console.error('[SERVER ERROR]', err));
-  server.listen(port, host, () => console.log('CFnew 独立面板已启动，端口 ' + port));
-  const shutdown = () => server.close(() => process.exit(0));
+
+  const ports = Array.from(new Set([mainPort, 3100, 3000].filter(Boolean)));
+  const servers = [];
+  for (const p of ports) {
+    try {
+      const s = createPanelServer();
+      s.on('error', (err) => {
+        if (err.code === 'EADDRINUSE' && p !== mainPort) return;
+        console.error(`[SERVER ERROR :${p}]`, err);
+      });
+      s.listen(p, host, () => console.log('CFnew 独立面板已启动，端口 ' + p));
+      servers.push(s);
+    } catch {}
+  }
+
+
+
+
+  const shutdown = () => { for (const s of servers) s.close(); process.exit(0); };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
