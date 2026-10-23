@@ -216,6 +216,8 @@ export async function handlePanel(request) {
 
 export function createPanelServer() {
   return createHttpServer(async (incoming, outgoing) => {
+    incoming.on('error', () => {});
+    outgoing.on('error', () => {});
     console.log('[REQ]', incoming.method, incoming.url);
     try {
 
@@ -239,15 +241,15 @@ export function createPanelServer() {
       if (incoming.method === 'HEAD') { outgoing.end(); return; }
       outgoing.end(Buffer.from(await response.arrayBuffer()));
     } catch {
-      outgoing.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      outgoing.end(JSON.stringify({ success: false, message: '服务暂时不可用，请稍后重试' }));
+      if (!outgoing.headersSent) outgoing.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      if (!outgoing.writableEnded) outgoing.end(JSON.stringify({ success: false, message: '服务暂时不可用，请稍后重试' }));
     }
   });
 }
 
 if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.on('uncaughtException', (err) => console.error('[UNCAUGHT EXCEPTION]', err));
-  process.on('unhandledRejection', (err) => console.error('[UNHANDLED REJECTION]', err));
+  process.on('uncaughtException', (err) => console.log('[UNCAUGHT EXCEPTION]', err?.stack || err));
+  process.on('unhandledRejection', (err) => console.log('[UNHANDLED REJECTION]', err?.stack || err));
   const mainPort = Number(process.env.PORT || 3100);
   const host = process.env.HOST || '0.0.0.0';
 
@@ -268,7 +270,7 @@ if (!process.env.VERCEL && process.argv[1] && import.meta.url === pathToFileURL(
 
 
 
-  const shutdown = () => { for (const s of servers) s.close(); process.exit(0); };
+  const shutdown = (sig) => { console.log('[SIG]', sig); };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }
